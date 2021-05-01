@@ -1,0 +1,21 @@
+html {
+    font-size: 1em;
+    line-height: 1.4;
+    font-family: sans-serif;
+}
+
+path {
+    fill: none;
+    stroke: #000;
+    stroke-width: 1px;
+  }
+  .graticule {
+    fill: none;
+    stroke: #000;
+    stroke-width: .2px;
+  }
+  .foreground {
+    fill: none;
+    stroke: #333;
+    stroke-width: 1.2px;
+  }

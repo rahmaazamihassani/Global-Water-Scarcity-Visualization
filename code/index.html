@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+h1{
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+h2,
+h3 {
+    font-family: Arial, Helvetica, sans-serif;
+  margin: 10px;
+  font-size: 1.2em;
+}
+
+h3 {
+    font-family: Arial, Helvetica, sans-serif;
+  font-size: 1em;
+}
+
+h4 {
+    font-family: Arial, Helvetica, sans-serif;
+  margin: 2px;
+  font-size: 1em;
+}
+p {
+    font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.85em;
+  margin: 10px;
+  text-align: left;
+}
+
+/**
+* Create a position for the map
+* on the page */
+
+.legend-key {
+  display: inline-block;
+  border-radius: 20%;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+}
+
+
+div.tooltip {	
+    position: absolute;			
+    text-align: center;			
+    width: 130px;					
+    height: 30px;					
+    padding: 4px;				
+    font: 12px sans-serif;		
+    background: lightsteelblue;	
+    border: 0px;		
+    border-radius: 8px;			
+    pointer-events: none;			
+}
+
+</style>
+
+<body>
+
+<script src="https://d3js.org/d3.v5.js"></script>
+<script src='https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.js'></script>
+<link href='https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.css' rel='stylesheet' />
+
+<table style="margin: auto;">
+    <tr>
+        <td colspan="2"  style="text-align:center"><h1>GLOBAL WATER SCARCITY</h1></td> 
+    </tr>
+    <tr>
+        <td colspan="2" style="text-align:center">
+            <svg id='yearsvg' width="1150" height="500"></svg>
+        </td>
+    </tr>
+    <tr>
+        <td rowspan="3" style="width:920px;"><div id='map' style='width: 900px; height: 500px; border-style: solid; border-width: 1px; border-color: lightgray;'></div></td>
+    </tr>
+    <tr>
+      <td>
+        <h4>Regions</h4>
+        <div id='legend'></div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <h4>Selected Regions</h4>
+        <div style="height:150px;"  id='legendselected'></div>
+      </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="text-align:center">
+             <div style="height:400px;"  id='datasvg'></div>
+        </td>
+    </tr>
+</table>
+
+<script>
+
+var divChart = d3.select("body").append("div")
+.attr("class", "tooltip")
+.style("opacity", 0);
+
+divChart.append("svg").attr("width","340")
+.attr("height","300")
+.attr("id","regionchart");
+
+var layers = ['Europe', 'Australia Pacific & South East Asia', 'Middle East & Northern Africa', 'North America', 'South America', 'Southern Africa', 'Russia & Central Asia', 'South & East Asia'];
+//var colors = ['#ff8833', '#bdc25f', '#19c25a', '#2a61cf', '#d85fd2', '#d8a25f', '#3a4a26', '#aa431d'];
+
+//Colors interpolation, in case you want to try. No other change is needed, besides commenting out line 99 and uncommenting lines 102,103
+
+var paletteRegions = d3.scaleOrdinal(d3.schemeTableau10 );
+var colors = [0,1,2,3,4,5,6,7].map((nr)=>paletteRegions(nr));
+
+var years = ['1905','1915','1925','1935','1945','1955','1965','1975','1985','1995','2005'];
+
+var hoveredRegion = null;
+var selectedRegions = [];
+var controlKeyPressed = false;
+var selectedYearIndex = null;
+
+
+mapboxgl.accessToken = 'pk.eyJ1IjoiaDNyYTAiLCJhIjoiY2tiZ21lOW9xMDltMTJycDM1OWdxbmt6ayJ9.pc96eKANkpVSfRs_7a_lyA';
+var map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/h3ra0/ckbh5r05r076q1is3o1js87q6',
+    center: [10,30],
+    zoom: 1
+});
+
+map.setRenderWorldCopies(false);
+map.boxZoom.disable();
+map.dragRotate.disable();
+map.touchZoomRotate.disableRotation();
+map.doubleClickZoom.disable();
+
+map.on('load', function() {
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+
+    for (i = 0; i < layers.length; i++) {
+        var layer = layers[i];
+        var color = colors[i];
+        var item = document.createElement('div');
+        item.style = "font-family: Arial, Helvetica, sans-serif";
+        var key = document.createElement('span');
+        key.className = 'legend-key';
+        key.style.backgroundColor = color;
+        key.style.opacity = 1;
+
+        var value = document.createElement('span');
+        value.innerHTML = layer;
+        item.appendChild(key);
+        item.appendChild(value);
+        legend.appendChild(item);
+    }
+
+    map.addSource('regions', {
+        'type': 'geojson',
+        'data': './data/map.geojson',
+        'generateId': true
+    });
+
+    map.addLayer({
+        'id': 'regions-viz',
+        'type': 'fill',
+        'source': 'regions',
+        'layout': {},
+        "maxzoom": 7,
+        'paint': {
+            'fill-color': ["match", ["get", "id"], 0 , colors[0], 
+                                            1 , colors[1], 
+                                            2 , colors[2], 
+                                            3 , colors[3], 
+                                            4 , colors[4],
+                                            5 , colors[5],
+                                            6 , colors[6],
+                                            7 , colors[7],
+                                            '#000000'],
+            'fill-opacity': [
+                "match",
+                ['number', ['feature-state', 'state'], 0],
+                    0, 0.4,//normal
+                    1, 0.15,//normal & hovering
+                    2, 0.95,//selected
+                    3, 0.65,//selected and hovering
+                    1
+            ]
+        }
+    });
+
+    map.addLayer({
+        'id': 'region-borders',
+        'type': 'line',
+        'source': 'regions',
+        'layout': {},
+        'paint': {
+        'line-color': '#000000',
+        'line-width': 1,
+        'line-opacity': [
+                "match",
+                ['number', ['feature-state', 'state'], 0],
+                    0, 0.4,//normal
+                    1, 0.4,//normal & hovering
+                    2, 1,//selected
+                    3, 1,//selected and hovering
+                    1
+            ]
+        }
+    });
+});
+ 
+
+function onKeyDown(e) {
+    if (e.keyCode === 17) controlKeyPressed = true;
+}
+function onKeyUp(e) {
+    if (e.keyCode === 17) controlKeyPressed = false;
+}
+
+function selectAllFeatures(){
+    selectedRegions = [];
+    var allfeatures = map.querySourceFeatures("regions");
+    for (var i = 0; i < allfeatures.length; i++) {
+        if(getRegionSelectedIndex(allfeatures[i]) !== -1){
+            continue;
+        }
+        selectedRegions.push(allfeatures[i]);
+        map.setFeatureState({
+                source: "regions",
+                id: i,
+                }, {
+                state: getFeatureState(allfeatures[i],false)
+             });  
+    }
+    updateLegendSelected();
+    if(selectedYearIndex !== null){
+        updateStackedBarChart(selectedRegions, selectedYearIndex, layers, colors);
+
+    }
+}
+
+map.on('mouseover', 'regions-viz', function(e) {
+console.log(event.pageX);
+//POPUP
+    divChart.transition()
+    .duration(200)
+    .style("opacity", 1);
+    
+    divChart
+    .style("left", (event.pageX + 50) + "px")
+    .style("top", (event.pageY - 40) + "px");
+});
+
+
+
+map.on('mousemove', 'regions-viz', function(e) {
+    // Change the cursor styNe as a UI indicator.
+    map.getCanvas().style.cursor = 'pointer';
+
+    var feature = e.features[0];
+
+    //document.getElementById('pd').innerHTML = '<h3><strong>' + "ID" +feature.id + '</strong></h3><p><strong><em>' + feature.properties.DN + '</strong> people per square mile</em></p>';
+    
+   // div.html(document.getElementById('regionchart').innerHTML).style("left", (event.pageX + 5) + "px").style("top", (event.pageY - 40) + "px");
+
+    //regionChartSVG = div.append('svg');
+    //regionChartSVG.innerHTML = document.getElementById('regionchart').innerHTML;
+
+    divChart
+    .style("left", (event.pageX + 10) + "px")
+    .style("top", (event.pageY - 330) + "px")                
+    .style("width",  "360px")
+    .style("height", "320px");
+
+    if (hoveredRegion == null || e.features.length > 0 && hoveredRegion.id != feature.id) {
+        if(hoveredRegion){
+            map.setFeatureState({
+                source: "regions",
+                id: hoveredRegion.id,
+                }, {
+                state: getFeatureState(hoveredRegion,false)
+            });
+        }
+
+        hoveredRegion = feature;
+
+        map.setFeatureState({
+            source: "regions",
+            id: hoveredRegion.id,
+            }, {
+            state: getFeatureState(hoveredRegion,true)
+        });
+        document.getElementById('regionchart').innerHTML = '';
+        updateHoverRegionChart(hoveredRegion.id);
+    }
+
+});
+ 
+map.on('mouseleave', 'regions-viz', function() {
+    map.getCanvas().style.cursor = '';
+
+    divChart.transition()
+        .duration(500)
+        .style("opacity", 0);
+
+    if (hoveredRegion) {
+        map.setFeatureState(
+            { source: 'regions', id: hoveredRegion.id },
+            { state: getFeatureState(hoveredRegion,false) }
+        );
+    }
+    //document.getElementById('regionchart').innerHTML = '<p>Hover over a colored region!</p>';
+    hoveredRegion = null;
+
+
+
+});
+
+map.on('click', function(e) {
+    var features = map.queryRenderedFeatures(e.point, {
+        layers: ['regions-viz']
+    });
+
+    if (!features.length) {
+        selectAllFeatures();
+        return;
+    }
+
+    var feature = features[0];
+
+    if(controlKeyPressed){
+        var selectedIndex = getRegionSelectedIndex(feature);
+        if(selectedIndex !== -1){
+            selectedRegions.splice(selectedIndex, 1);
+            if(selectedRegions.length == 0){
+                selectAllFeatures();
+            }
+        }else{
+            selectedRegions.push(feature);
+        }
+    }else{
+        selectedRegions = [feature];
+    }
+
+    updateLegendSelected();
+
+    if(selectedRegions.length > 0 && selectedYearIndex !== null){
+        updateStackedBarChart(selectedRegions,selectedYearIndex,layers,colors);
+    }
+
+
+    console.log(feature.properties.DN);//onclick selected
+});
+
+function updateLegendSelected() {
+    legendselected.innerHTML = "";
+    for (var i = 0; i < selectedRegions.length; i++) {
+        var layer = layers[selectedRegions[i].id];
+        var color = colors[selectedRegions[i].id];
+        var item = document.createElement('div');
+        item.style = "font-family: Arial, Helvetica, sans-serif";
+        var key = document.createElement('span');
+        key.className = 'legend-key';
+        key.style.backgroundColor = color;
+        key.style.opacity = 1;
+
+        var value = document.createElement('span');
+        value.innerHTML = layer;
+        item.appendChild(key);
+        item.appendChild(value);
+        legendselected.appendChild(item);
+
+        map.setFeatureState({
+            source: "regions",
+            id: selectedRegions[i].id,
+            }, {
+            state: getFeatureState(selectedRegions[i],hoveredRegion != null && hoveredRegion.id ===  selectedRegions[i].id)
+        });
+    }
+
+    for (var i = 0; i < layers.length; i++) {
+        if(!isFeatureIdSelected(i)){
+            map.setFeatureState({ 
+                source: "regions",
+                id: i,
+                }, {
+                state: 0
+             });    
+        }
+    }
+}
+function getRegionSelectedIndex(feature) {
+    if(!feature){
+        return -1;
+    }
+    for (i = 0; i < selectedRegions.length; i++) {
+        if(selectedRegions[i].id === feature.id){
+            return i;
+        }
+    }
+    return -1;
+}
+function isFeatureIdSelected(featureId) {
+    for (i = 0; i < selectedRegions.length; i++) {
+        if(selectedRegions[i].id === featureId){
+            return true;
+        }
+    }
+    return false;
+}
+function getFeatureState(feature, hovering){
+    var selected = getRegionSelectedIndex(feature)
+    if(selected !== -1){
+        if(hovering){
+            return 3;
+        }else{
+            return 2;
+        }
+    }else{
+        if(hovering){
+            return 1;
+        }else{
+            return 0;
+        }
+    }
+}
+</script>
+
+<script src="./src/main.js" defer async></script>
+
+
+
+</body> 

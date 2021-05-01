@@ -79,7 +79,7 @@ We used stacked bar charts, to display the data of the selected regions. e.g. th
 
 This is only a sketch, the displayed data and colors are not correct and only improvised.
 
-![Sketch of the dashboard](https://github.com/jku-icg-classroom/infovis-lab-project-2020-waterscarcity/blob/master/draft.png)
+![Sketch of the dashboard](https://github.com/rahmaazamihassani/Global-Water-Scarcity-Visualization/blob/35014a845f2a206b860fc651533b1739c79618b0/draft.png)
 
 
 # Submission due on 17.06.2020
